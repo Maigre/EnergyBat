@@ -1,0 +1,312 @@
+<?php if ( ! defined('BASEPATH')) exit('No direct script access allowed');
+
+include_once('crudentry_model.php');
+include_once('batiment_aux_model.php');
+
+class Batiment_model extends Crudentry_model
+{
+	public $statut;
+	private $reload_ARGS;
+	public $Bat_Occupation;
+	public $Bat_Technique;
+	public $Bat_Equip_Air;
+	public $Bat_Niveaux;
+	
+	//NBR
+	public $Bat_Niveaux_pieces;
+	public $Bat_Niveaux_eclairages;
+	
+	//CONSTRUCTION : CHARGE UN BATIMENT VIERGE
+	function __construct()
+	{
+		parent::__construct();
+		
+		$this->init('Batiment');
+		$this->statut = 0;
+		$this->make_inputs();
+		
+		$this->Bat_Occupation = new Bat_Occupation_model();
+		$this->Bat_Technique = new Bat_Technique_model();
+		$this->Bat_Equip_Air = new Bat_Equip_Air_model();
+		$this->Bat_Niveaux = array();
+	}
+
+	//CHARGE UN BATIMENT DONNE ET SES EXTENSIONS
+	function get($idBatiment,$forced_statut=false)
+	{
+		$this->reload_ARGS = array($idBatiment,$forced_statut);
+
+		$this->load($idBatiment);
+		
+		$this->statut = 1; //BAT NEUF
+		if ($this->data->Nom != '')
+		{
+			if (is_null($this->data->DateSaisie)) $this->statut = 2; //2 : EDITION
+			else $this->statut = 3; //BAT DISPLAY RECENS
+		}
+		
+		if ($forced_statut) $this->statut = $forced_statut; //STATUT FORCE (pour reedition)) et display Consult
+		
+		$this->RW->Read = 1; 
+		$this->RW->Insert = 1;
+		$this->RW->Update = 1;
+
+		$this->make_inputs();
+		
+		$this->Bat_Occupation->get($idBatiment,$this->statut);
+		$this->Bat_Technique->get($idBatiment,$this->statut);
+		$this->Bat_Equip_Air->get($idBatiment,$this->statut);
+		
+		for($i=1;$i<=$this->data->NiveauNbr;$i++) 
+		{
+			$this->Bat_Niveaux[$i] = new Bat_Niveaux_model($idBatiment,$i,$this->statut);
+			$this->Bat_Niveaux_pieces[$i] = $this->Bat_Niveaux[$i]->Aux['Pieces']->pieces_nbr;
+			$this->Bat_Niveaux_eclairages[$i] = $this->Bat_Niveaux[$i]->Aux['EclairPieces']->eclairage_nbr + $this->Bat_Niveaux[$i]->Aux['EclairCouloir']->eclairage_nbr ;
+		}
+		
+	}
+	
+	//RECHARGE LE BATIMENT
+	function reload()
+	{
+		$this->editing(false);
+		list($a1,$a2) = $this->reload_ARGS;
+		$this->get($a1,false);
+	}
+	
+	//PASSE LE BATIMENT EN EDITION
+	function edit()
+	{
+		$this->get($this->id(),2);
+		$this->editing(true);
+	}
+	
+	//CREATION DES CHAMPS ET INFOS
+	function make_inputs()
+	{		
+		$this->form['Nom']->set('Nom','text',30)->add_rule('required');
+		$this->form['Annee']->set('Annee','text',3)->add_rule('integer');
+		$this->form['NiveauNbr']->set('Nombre de Niveau','nbr_list10',3)->add_rule('required');
+		$this->form['SurfaceSol']->set('Surface Sol','text',3)->add_rule('numeric');
+		$this->form['SurfaceSolReel']->set('Sol Reel','check',3);
+		$this->form['SurfaceTotal']->set('Surface Total','text',3)->add_rule('required|numeric');
+		$this->form['SurfaceTotalReel']->set('Total Reel','check',3);		
+		$this->form['Commentaire']->set('Observations','textarea',2,100);
+				
+		$this->add_form('SubmitBTN')->set('Enregistrer','submit','save_bat');
+		$this->add_form('StepBTN')->set('Sauvegarde Intermediaire','submit','step_bat');
+		$this->add_form('EditBTN')->set('Modifier','submit','edit_bat');	
+		$this->add_form('DeleteBTN')->set('Supprimer','submit','delete_bat','Supprimer ce Bâtiment ?');	
+		
+		if ($this->statut == 1)
+		{
+			//DEFAULT VALUES :
+			$this->setdata('DateCreation',date('Y-m-d'));
+			
+			//DISPLAY PARAMETERS
+			$display = array(
+						'Nom'		=> 'field',
+						'NiveauNbr'	=> 'field',						
+						'SubmitBTN' 	=> 'field'
+					);
+
+			$this->fields_method($display);
+			
+		}
+		else if ($this->statut == 2)
+		{
+			//DEFAULT VALUES :
+			$this->setdata('DateSaisie',date('Y-m-d'));
+			
+			//DISPLAY PARAMETERS
+			$display = array(
+						'Nom'		=> 'field',
+						'Annee' 	=> 'field',
+						'NiveauNbr' 	=> 'field',
+						'SurfaceSol' 	=> 'field',
+						'SurfaceSolReel' => 'field',
+						'SurfaceTotal' 	=> 'field',
+						'SurfaceTotalReel' => 'field',
+						'SubmitBTN' 	=> 'field',
+						'StepBTN' 	=> 'field',
+						'DeleteBTN' 	=> 'field',
+						'Commentaire' 	=> 'field'
+					);
+					
+			$this->fields_method($display);
+		}
+		else if ($this->statut >= 3)
+		{			
+			$this->fields_method('display');
+			
+			if (($this->statut == 3)||(($this->statut == 4)&&($this->simplelogin->group() >= 3))) $butt = 'field';
+			else $butt = 'hide';
+			
+			$display = array(
+						'EditBTN' 	=> $butt,
+						'SubmitBTN' 	=> 'hide',
+						'StepBTN' 	=> 'hide'
+					);
+					
+			$this->fields_method($display);
+		}
+	}
+	
+	//TRAITEMENT DES ACTIONS
+	function process($idSite=null) //get & execute action !
+	{ 
+		switch($this->action)
+		{
+			case 'save_bat':				
+			case 'step_bat':
+				if (is_null($this->data->idSite)) $this->setdata('idSite',$idSite);
+				else if ($this->editing()) $this->edit();
+
+				$go = $this->checkfields();
+					
+				if ($this->statut > 1)
+				{						
+					if(!$this->Bat_Occupation->process()) $go=false;
+					if(!$this->Bat_Technique->process()) $go=false;
+					if(!$this->Bat_Equip_Air->process()) $go=false;
+					
+					for($i=1;$i<=$this->data->NiveauNbr;$i++) 
+						if ((isset($this->Bat_Niveaux[$i]))&&(!$this->Bat_Niveaux[$i]->process())) $go=false;
+				}
+					
+				if ($go) 
+				{
+					$this->save();
+					if ($this->statut > 1)
+					{
+						$this->Bat_Occupation->save();
+						$this->Bat_Technique->save();
+						$this->Bat_Equip_Air->save();
+						
+						for($i=1;$i<=$this->data->NiveauNbr;$i++) if (isset($this->Bat_Niveaux[$i])) $this->Bat_Niveaux[$i]->saveAll();
+					}
+					
+					//refresh site cache
+					$Sitin = new Site_model();
+					$Sitin->lazy_get($idSite,0);	
+					
+					if ($this->statut == 1)
+					{
+						//redirect(str_replace($this->wantedID,'',uri_string())); //nouveau record : on retourne à l'acceuil
+						redirect(str_replace('/'.$idSite.'/'.$this->wantedID,'/'.$idSite.'/'.$this->id(),uri_string())); //continue record
+					} 
+					else if ($this->action == 'save_bat') redirect(uri_string());
+					else $this->edit();
+				} 
+				else $this->make_inputs();
+			break;
+			
+			case 'edit_bat':
+				if ($this->guard('Update')) $this->edit();
+			break;
+			
+			case 'delete_bat':
+				$id = $this->id();
+				$this->remove();
+				redirect(str_replace('/'.$idSite.'/'.$id,'/'.$idSite,uri_string()));
+			break;
+		}
+	}
+	
+	function info()
+	{
+		$info['Nom'] = 	$this->form['Nom']->get();
+		$info['Surface Sol'] = $this->form['SurfaceSol']->get().' m²';
+		$info['Surface Total'] = $this->form['SurfaceTotal']->get().' m²';
+		$info['Année'] = $this->form['Annee']->get();
+		$info['Niveau'] = $this->form['NiveauNbr']->get();
+		$info['   '] = '';
+		$info['Observations'] = $this->form['Commentaire']->get();
+		
+		return $info;
+	}
+	
+	function diag()
+	{
+		//surface
+		$val['Surface'] = $this->form['SurfaceTotal']->get();
+		
+		//occupants
+		$val['Occupants'] = $this->Bat_Occupation->form['OccupantNbr']->get();
+		$val['Occupants2'] = $this->Bat_Occupation->form['OccupantNbr2']->get();
+		
+		//Nombre de pièces
+		$val['Npieces'] = 0;
+		
+		//Puissance installée
+		$val['Pinstall'] = 0;
+				
+		//Puissance installée éclairage
+		$val['Peclair'] = 0;
+		$val['Neclair'] = 0;
+		$val['PeclairIncandesc'] = 0;
+		$val['NeclairIncandesc'] = 0;
+		$val['PeclairBasseConso'] = 0;
+		$val['NeclairBasseConso'] = 0;
+		$val['PeclairLustre'] = 0;
+		$val['NeclairLustre'] = 0;
+		$val['PeclairNeon'] = 0;
+		$val['NeclairNeon'] = 0;
+				
+		//Puissance clim installée
+		$val['Pclim'] = 0;
+		$val['Nclim'] = 0;
+		
+		//Surface au sol utilisable pour chaque niveaux ?
+		$surfaceNiveauUsable = abs($this->form['SurfaceTotal']->get()-($this->form['SurfaceSol']->get()*$this->data->NiveauNbr)) <= ($this->form['SurfaceTotal']->get()*0.2);
+		$surfaceNiveauUsable = $surfaceNiveauUsable and ($this->form['SurfaceSol']->get() > 0);
+		
+		for($i=1;$i<=$this->data->NiveauNbr;$i++) 
+		{
+			//echo $i;
+			//echo $this->data->NiveauNbr;
+			
+			$nval[$i] = $this->Bat_Niveaux[$i]->diag();
+						
+			//add to total (somme des niveaux)
+			foreach($nval[$i] as $k=>$v)
+			{
+				if(isset($val[$k])) $val[$k] += $v;
+				else $val[$k] = $v;
+			}
+			
+			
+			if ($surfaceNiveauUsable)
+			{
+				$nval[$i]['Surface'] = $this->form['SurfaceSol']->get();
+				$nval[$i]['Peclair/m²'] = round($nval[$i]['Peclair']*100/$this->form['SurfaceSol']->get())/100;
+				$nval[$i]['Pclim/m²'] = round($nval[$i]['Pclim']*100/$this->form['SurfaceSol']->get())/100;
+			}
+		}
+		
+		//Details
+		$val['Niveaux'] = $nval;
+		
+		
+		//ratio Superficie totale
+		if ($val['Surface'] > 0)
+		{	
+			$val['Peclair/m²'] = round($val['Peclair']*100/$val['Surface'])/100;
+			$val['Pclim/m²'] = round($val['Pclim']*100/$val['Surface'])/100;
+		}
+		
+		//ratio Occupants
+		if ($val['Occupants'] > 0)
+		{	
+			$val['Peclair/pers'] = round($val['Peclair']*100/$val['Occupants'])/100;
+			$val['Pclim/pers'] = round($val['Pclim']*100/$val['Occupants'])/100;
+		}
+		
+		//print_r($val); die;
+		return $val;
+	}
+	
+		
+}
+
+?>
