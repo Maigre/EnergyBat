@@ -34,7 +34,7 @@
 					</TH>
 					<TH>
 						<!-- Print Form -->
-						<?=form_open(base_url().'index.php/consult/printList');?>
+						<?=form_open('consult/printList');?>
 							<input type="image" src="<?=base_url()?>images/icons/selection/printer.png" style="margin-top:5px;margin-left:5px;" />
 						<?=form_close();?>
 					</TH>
@@ -42,7 +42,7 @@
 				<TR>
 					<TD colspan="2">
 						<!-- Tri formulaire -->	
-						<?=form_open(base_url().'index.php/consult');?>
+						<?=form_open('consult/');?>
 						<table>
 							<THEAD>
 								<TR>
@@ -138,7 +138,7 @@
 
 
 
-<?=form_open(base_url().'index.php/consult/ForceCache');?>
+<?=form_open('consult/ForceCache');?>
 <input type="submit" value="Forcer la mise à jour des données !" />
 <?=form_close();?>
 

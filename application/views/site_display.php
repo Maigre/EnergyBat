@@ -1,6 +1,6 @@
 <?=validation_errors()?>
 
-<?=form_open(base_url().'index.php/consult/site/'.$Site['idSite'].'/printInfo');?>
+<?=form_open('consult/site/'.$Site['idSite'].'/printInfo');?>
 <div style="float:left;margin-top:15px;margin-right:10px;">
 	<input type="image" src="<?=base_url()?>images/icons/selection/printer.png" />
 </div>
@@ -160,7 +160,7 @@
 		</h3>
 	
 	<div class="label">
-		<?=form_open(base_url().'index.php/consult/site/'.$Site['idSite'].'/printDiag');?>
+		<?=form_open('consult/site/'.$Site['idSite'].'/printDiag');?>
 		<div style="float:left;margin-top:8px;margin-right:10px;">
 			<input type="image" src="<?=base_url()?>images/icons/selection/printer.png" />
 		</div>
